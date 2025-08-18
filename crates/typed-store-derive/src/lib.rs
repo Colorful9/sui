@@ -375,7 +375,7 @@ pub fn derive_dbmap_utils_general(input: TokenStream) -> TokenStream {
                 );
                 Self {
                     #(
-                        #field_names: #post_process_fn(inner.#field_names),
+                        #field_names: inner.#field_names,
                     )*
                 }
             }
@@ -574,7 +574,7 @@ pub fn derive_dbmap_utils_general(input: TokenStream) -> TokenStream {
                 let inner = #intermediate_db_map_struct_name::open_tables_read_only_as_rw_impl(primary_path, metric_conf);
                 Self {
                     #(
-                        #field_names: #post_process_fn(inner.#field_names),
+                        #field_names: inner.#field_names,
                     )*
                 }
             }
