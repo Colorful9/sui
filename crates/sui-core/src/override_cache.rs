@@ -1,4 +1,4 @@
-tx_handler.rsuse std::sync::Arc;
+use std::sync::Arc;
 
 use crate::authority::authority_per_epoch_store::AuthorityPerEpochStore;
 use crate::authority::authority_store;
