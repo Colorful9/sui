@@ -407,6 +407,7 @@ inquire = "0.6.0"
 insta = { version = "1.21.1", features = ["redactions", "yaml", "json"] }
 insta-cmd = "0.6.0"
 integer-encoding = "3.0.1"
+interprocess = { version = "2", features = ["tokio"] }
 ipnetwork = "0.20.0"
 iso8601 = "0.6.3"
 itertools = "0.13.0"
@@ -662,7 +663,11 @@ anemo-cli = { git = "https://github.com/mystenlabs/anemo.git", rev = "9c52c3c794
 anemo-tower = { git = "https://github.com/mystenlabs/anemo.git", rev = "9c52c3c7946532163a79129db15180cdb984bab4" }
 
 # core-types from the new sdk for use in gRPC
-sui-sdk-types = { git = "https://github.com/MystenLabs/sui-rust-sdk.git", rev = "cab42748a4c00072c6be00a08755b6c71274aaee", features = [ "hash", "serde" ] }
+sui-sdk-types = { git = "https://github.com/MystenLabs/sui-rust-sdk.git", rev = "cab42748a4c00072c6be00a08755b6c71274aaee", features = [
+  "hash",
+  "serde",
+  "schemars",
+] }
 sui-crypto = { git = "https://github.com/MystenLabs/sui-rust-sdk.git", rev = "cab42748a4c00072c6be00a08755b6c71274aaee", features = [ "ed25519", "secp256r1", "secp256k1", "passkey", "zklogin" ] }
 sui-rpc = { git = "https://github.com/MystenLabs/sui-rust-sdk.git", rev = "cab42748a4c00072c6be00a08755b6c71274aaee" }
 sui-graphql-client = { git = "https://github.com/MystenLabs/sui-rust-sdk.git", rev = "cab42748a4c00072c6be00a08755b6c71274aaee" }
