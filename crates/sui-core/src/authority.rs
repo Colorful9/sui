@@ -60,7 +60,6 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     pin::Pin,
-    str::FromStr,
     sync::Arc,
     vec,
 };
@@ -1684,7 +1683,7 @@ impl AuthorityState {
             None
         };
 
-        let (transaction_outputs, timings, execution_error_opt) = if let Some(outputs) =
+        let (transaction_outputs, timings, execution_error_opt, tmp_inner_store) = if let Some(outputs) =
             mysticeti_fp_outputs
         {
             assert!(
@@ -1699,9 +1698,9 @@ impl AuthorityState {
                 ?tx_digest,
                 "Mysticeti fastpath certified transaction outputs found in cache, skipping execution and committing"
             );
-            (outputs, None, None)
+            (outputs, None, None, None)
         } else {
-            let (transaction_outputs, timings, execution_error_opt) = self
+            let (transaction_outputs, timings, execution_error_opt, tmp_inner_store) = self
                 .process_certificate(
                     &tx_guard,
                     &execution_guard,
@@ -1716,6 +1715,7 @@ impl AuthorityState {
                 Arc::new(transaction_outputs),
                 Some(timings),
                 execution_error_opt,
+                tmp_inner_store
             )
         };
 
@@ -1734,7 +1734,7 @@ impl AuthorityState {
                 .write_fastpath_transaction_outputs(transaction_outputs);
         } else {
             let commit_result =
-                self.commit_certificate(certificate, transaction_outputs, epoch_store);
+                self.commit_certificate(certificate, transaction_outputs, epoch_store, tmp_inner_store);
             if let Err(err) = commit_result {
                 error!(?tx_digest, "Error committing transaction: {err}");
                 tx_guard.release();
@@ -1899,6 +1899,7 @@ impl AuthorityState {
         TransactionOutputs,
         Vec<ExecutionTiming>,
         Option<ExecutionError>,
+        InnerTemporaryStore
     )> {
         let _scope = monitored_scope("Execution::process_certificate");
         let tx_digest = *certificate.digest();
@@ -1960,17 +1961,16 @@ impl AuthorityState {
         certificate: &VerifiedExecutableTransaction,
         transaction_outputs: Arc<TransactionOutputs>,
         epoch_store: &Arc<AuthorityPerEpochStore>,
+        tmp_inner_store: InnerTemporaryStore
     ) -> SuiResult {
-        let raw_events = inner_temporary_store.events.clone();
-
+        let raw_events = transaction_outputs.events.data.clone();
         let sui_events: Vec<SuiEvent> = raw_events
-            .data
             .iter()
             .enumerate()
             .map(|(seq, event)| {
                 let mut layout_resolver = epoch_store.executor().type_layout_resolver(Box::new(
                     PackageStoreWithFallback::new(
-                        &inner_temporary_store,
+                        &tmp_inner_store,
                         self.get_backing_package_store(),
                     ),
                 ));
@@ -2046,8 +2046,7 @@ impl AuthorityState {
 
                 if need_notify {
                     self.cache_update_handler
-                        .notify_written(changed_objects)
-                        .await;
+                        .notify_written(changed_objects);
                 }
             }
         }
@@ -2064,8 +2063,7 @@ impl AuthorityState {
         {
             let _ = self
                 .tx_handler
-                .send_tx_effects_and_events(transaction_outputs.effects, sui_events)
-                .await;
+                .send_tx_effects_and_events(transaction_outputs.effects, sui_events);
         }
 
         match self.execution_scheduler.as_ref() {
@@ -2145,6 +2143,7 @@ impl AuthorityState {
         TransactionOutputs,
         Vec<ExecutionTiming>,
         Option<ExecutionError>,
+        InnerTemporaryStore
     )> {
         let _scope = monitored_scope("Execution::prepare_certificate");
         let _metrics_guard = self.metrics.prepare_certificate_latency.start_timer();
@@ -2316,7 +2315,7 @@ impl AuthorityState {
             );
         }
 
-        Ok((transaction_outputs, timings, execution_error_opt.err()))
+        Ok((transaction_outputs, timings, execution_error_opt.err(), inner_temp_store.clone()))
     }
 
     pub fn prepare_certificate_for_benchmark(
