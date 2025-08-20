@@ -9,6 +9,10 @@ use sui_json_rpc_types::SuiEvent;
 use sui_types::effects::TransactionEffects;
 use tokio::{io::AsyncWriteExt, sync::Mutex};
 
+// ⬇️ 新增：用于在同步方法里执行异步代码
+use tokio::runtime::{Handle, Runtime};
+use tokio::task::block_in_place;
+
 pub const TX_SOCKET_PATH: &str = "/tmp/sui_tx.sock";
 
 #[derive(Clone)]
@@ -60,7 +64,8 @@ impl TxHandler {
         }
     }
 
-    pub async fn send_tx_effects_and_events(
+    // ⬇️ 原逻辑移动到私有 async 函数
+    async fn send_tx_effects_and_events_async(
         &self,
         effects: &TransactionEffects,
         events: Vec<SuiEvent>,
@@ -87,7 +92,7 @@ impl TxHandler {
                 conn.write_all(&events_bytes).await?;
                 Ok(())
             }
-            .await;
+                .await;
 
             if result.is_ok() {
                 active_conns.push(conn);
@@ -97,5 +102,21 @@ impl TxHandler {
         *conns = active_conns;
 
         Ok(())
+    }
+
+    // ⬇️ 对外同步方法：阻塞直到发送完成
+    pub fn send_tx_effects_and_events(
+        &self,
+        effects: &TransactionEffects,
+        events: Vec<SuiEvent>,
+    ) -> Result<()> {
+        if let Ok(handle) = Handle::try_current() {
+            // 已在 Tokio 运行时中：用 block_in_place 防止阻塞运行时的 I/O 线程
+            block_in_place(|| handle.block_on(self.send_tx_effects_and_events_async(effects, events)))
+        } else {
+            // 不在运行时中：创建临时运行时
+            let rt = Runtime::new()?;
+            rt.block_on(self.send_tx_effects_and_events_async(effects, events))
+        }
     }
 }
